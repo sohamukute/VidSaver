@@ -11,8 +11,7 @@ A modern, full-stack YouTube video downloader built with React (TypeScript) fron
 - 🚀 Fast Rust backend with concurrent processing
 - 🎨 Beautiful animations and hover effects
 ## Video
-Click on image to view demo video.
-[![Watch the video](./assets/img.png)](./assets/demo.mp4)
+file://assets/demo.mp4
 
 ## Tech Stack
 
