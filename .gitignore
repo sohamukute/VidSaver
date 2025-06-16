@@ -1,70 +1,39 @@
-# Rust build output
-/target/
+/backend/target/
+/backend/Cargo.lock
+/backend/*.rs.bk
+/backend/*.rs~
 
-# Cargo package backup files
-**/*.rs.bk
-**/*.rs~
-
-# Environment files
-.env
-.env.*
-
-# Rust build artifacts
 **/*.rlib
 **/*.rmeta
+**/*.profraw
+*.dSYM
+*.d
 
-# IDE/editor config
+/frontend/node_modules/
+/frontend/.next/
+/frontend/.turbo/
+/frontend/.vercel/
+/frontend/build/
+/frontend/dist/
+/frontend/.env*
+/frontend/coverage/
+/frontend/yarn.lock
+/frontend/package-lock.json
+
+.env
+.env.*
+*.log
+*.swp
+*~
+.DS_Store
 .vscode/
 .idea/
 *.iml
 *.code-workspace
 
-# System files
-.DS_Store
+/**/.dockerignore
+/docker-compose.override.yml
 
-# Temporary/backup files
-*.swp
-*~
-
-# Logs and dumps
-*.log
-
-# Compiled binaries
-*.exe
-*.dll
-*.so
-*.dylib
-*.bin
-*.out
-
-# Coverage/debug/test outputs
-/coverage/
-/debug/
-/dist/
-/*.profraw
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.env
+Thumbs.db
+ehthumbs.db
+Desktop.ini
