@@ -10,6 +10,9 @@ A modern, full-stack YouTube video downloader built with React (TypeScript) fron
 - ⬇️ Multiple download options (Video+Audio, Audio Only, MP3 conversion)
 - 🚀 Fast Rust backend with concurrent processing
 - 🎨 Beautiful animations and hover effects
+## Video
+Click on image to view demo video.
+[![Watch the video](./assets/img.png)](./assets/demo.mp4)
 
 ## Tech Stack
 
@@ -57,7 +60,7 @@ cd ..
 
 1. Start the backend server:
 ```bash
-npm run backend
+npm run 
 ```
 The backend will run on http://localhost:3001
 
