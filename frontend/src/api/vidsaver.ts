@@ -1,6 +1,6 @@
 import { VideoInfo, QualityOptions, DownloadRequest } from '../types';
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export async function getVideoInfo(url: string): Promise<VideoInfo> {
   const response = await fetch(`${API_BASE_URL}/api/video-info`, {
