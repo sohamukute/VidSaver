@@ -11,7 +11,7 @@ A modern, full-stack YouTube video downloader built with React (TypeScript) fron
 - 🚀 Fast Rust backend with concurrent processing
 - 🎨 Beautiful animations and hover effects
 ## Video
-
+https://github.com/user-attachments/assets/45ebc3ed-a12e-4bb4-a8c3-f485224cb786
 
 ## Tech Stack
 
@@ -32,14 +32,14 @@ A modern, full-stack YouTube video downloader built with React (TypeScript) fron
 Make sure you have installed:
 - Node.js (v16 or later)
 - Rust (latest stable version)
-- yt-dlp (`pip install yt-dlp` or `brew install yt-dlp`)
-- FFmpeg (`brew install ffmpeg` or download from https://ffmpeg.org/)
+- yt-dlp (`pip install yt-dlp` )
+- FFmpeg (download from https://ffmpeg.org/)
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/sohamukute/VidSaver.git
 cd vidsaver
 ```
 
@@ -59,7 +59,7 @@ cd ..
 
 1. Start the backend server:
 ```bash
-npm run 
+cargo run
 ```
 The backend will run on http://localhost:3001
 
