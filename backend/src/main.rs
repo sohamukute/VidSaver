@@ -6,6 +6,7 @@ use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber;
+use std::process::Command;
 
 mod handlers;
 mod services;
@@ -14,7 +15,7 @@ mod types;
 use handlers::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
@@ -33,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
         );
 
-    // Get dynamic port for Render
+    // Run it with hyper on the port Render provides
     let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
     let addr = format!("0.0.0.0:{}", port);
-    let listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&addr).await.unwrap();
 
     println!("🚀 VidSaver backend running on http://localhost:{port}");
     println!("📋 Available endpoints:");
@@ -46,14 +47,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  POST /api/download - Download video/audio");
 
     // Check if yt-dlp is available
-    if std::process::Command::new("yt-dlp").arg("--version").output().is_ok() {
-        println!("✅ yt-dlp is available");
+    let yt_dlp_path = std::env::var("YT_DLP_PATH").unwrap_or_else(|_| "yt-dlp".to_string());
+
+    let yt_dlp_available = Command::new(&yt_dlp_path)
+        .arg("--version")
+        .output()
+        .is_ok();
+
+    if yt_dlp_available {
+        println!("✅ yt-dlp is available at {}", yt_dlp_path);
     } else {
-        println!("⚠️  yt-dlp is not available - only mock data will be returned");
+        println!("⚠️ yt-dlp not found. Attempting to install via pip...");
+
+        let install_result = Command::new("python3")
+            .args(["-m", "pip", "install", "--user", "yt-dlp"])
+            .status();
+
+        match install_result {
+            Ok(status) if status.success() => {
+                println!("✅ yt-dlp installed via pip");
+            }
+            _ => {
+                println!("❌ Failed to install yt-dlp via pip");
+            }
+        }
     }
 
-    axum::serve(listener, app).await?;
-    Ok(())
+    axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> &'static str {
