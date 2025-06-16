@@ -11,7 +11,7 @@ A modern, full-stack YouTube video downloader built with React (TypeScript) fron
 - 🚀 Fast Rust backend with concurrent processing
 - 🎨 Beautiful animations and hover effects
 ## Video
-https://github.com/sohamukute/VidSaver/blob/main/assets/demo.mp4)
+
 
 ## Tech Stack
 
