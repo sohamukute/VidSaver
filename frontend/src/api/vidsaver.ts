@@ -36,7 +36,9 @@ export async function getQualityOptions(url: string): Promise<QualityOptions> {
   return response.json();
 }
 
-export async function downloadVideo(request: DownloadRequest, videoTitle?: string): Promise<void> {
+export async function downloadVideo(request: DownloadRequest): Promise<void> {
+  console.log('Downloading with request:', request);
+  
   const response = await fetch(`${API_BASE_URL}/api/download`, {
     method: 'POST',
     headers: {
@@ -50,64 +52,33 @@ export async function downloadVideo(request: DownloadRequest, videoTitle?: strin
     throw new Error(`Download failed: ${errorText}`);
   }
 
+  // Get filename from Content-Disposition header if available
+  const contentDisposition = response.headers.get('content-disposition');
+  let filename = 'download';
+  
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (filenameMatch) {
+      filename = filenameMatch[1];
+    }
+  } else {
+    // Fallback filename based on type
+    const extension = request.type === 'mp3' ? 'mp3' : 
+                     request.type === 'audio' ? 'm4a' : 'mp4';
+    filename = `download.${extension}`;
+  }
+
   // Handle file download
   const blob = await response.blob();
   const downloadUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;
-  
-  // Generate filename based on request type and video title
-  const sanitizedTitle = sanitizeFilename(videoTitle || 'download');
-  let filename: string;
-  
-  switch (request.type) {
-    case 'mp3':
-      filename = `${sanitizedTitle}.mp3`;
-      break;
-    case 'audio':
-      // Use the audio format extension if available
-      const audioExt = getAudioExtension(request.audioQuality);
-      filename = `${sanitizedTitle}.${audioExt}`;
-      break;
-    case 'video':
-    default:
-      // Use mp4 as default for video downloads
-      filename = `${sanitizedTitle}.mp4`;
-      break;
-  }
-  
   a.download = filename;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(downloadUrl);
-}
-
-function sanitizeFilename(filename: string): string {
-  // Remove or replace invalid filename characters
-  return filename
-    .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid characters with underscores
-    .replace(/\s+/g, '_') // Replace spaces with underscores
-    .replace(/_{2,}/g, '_') // Replace multiple underscores with single
-    .replace(/^_|_$/g, '') // Remove leading/trailing underscores
-    .substring(0, 100); // Limit length
-}
-
-function getAudioExtension(audioQuality?: string): string {
-  // Try to determine extension from format ID
-  // Common YouTube audio format IDs and their extensions
-  const formatExtensions: Record<string, string> = {
-    '140': 'm4a',  // 128kbps AAC
-    '139': 'm4a',  // 48kbps AAC
-    '249': 'webm', // 50kbps Opus
-    '250': 'webm', // 70kbps Opus
-    '251': 'webm', // 160kbps Opus
-  };
   
-  if (audioQuality && formatExtensions[audioQuality]) {
-    return formatExtensions[audioQuality];
-  }
-  
-  // Default to m4a for audio downloads
-  return 'm4a';
+  console.log(`Download completed: ${filename} (${blob.size} bytes)`);
 }

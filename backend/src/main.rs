@@ -35,6 +35,18 @@ async fn main() {
     // Run it with hyper on localhost:3001
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     println!("🚀 VidSaver backend running on http://localhost:3001");
+    println!("📋 Available endpoints:");
+    println!("  GET  / - Health check");
+    println!("  POST /api/video-info - Extract video metadata");
+    println!("  POST /api/quality-options - Get available qualities");
+    println!("  POST /api/download - Download video/audio");
+    
+    // Check if yt-dlp is available
+    if std::process::Command::new("yt-dlp").arg("--version").output().is_ok() {
+        println!("✅ yt-dlp is available");
+    } else {
+        println!("⚠️  yt-dlp is not available - only mock data will be returned");
+    }
     
     axum::serve(listener, app).await.unwrap();
 }

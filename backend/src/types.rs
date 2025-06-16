@@ -1,6 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VideoInfoRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QualityOptionsRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VideoInfo {
     pub url: String,
     pub title: String,
@@ -11,7 +21,7 @@ pub struct VideoInfo {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VideoFormat {
     pub format_id: String,
     pub quality: String,
@@ -21,7 +31,7 @@ pub struct VideoFormat {
     pub height: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AudioFormat {
     pub format_id: String,
     pub ext: String,
@@ -35,12 +45,18 @@ pub struct QualityOptions {
     pub audio: Vec<AudioFormat>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadRequest {
     pub url: String,
-    pub r#type: String, // "video", "audio", or "mp3"
+    pub r#type: String, // 'video', 'audio', or 'mp3'
     #[serde(rename = "videoQuality")]
     pub video_quality: Option<String>,
     #[serde(rename = "audioQuality")]
     pub audio_quality: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DownloadResponse {
+    pub filename: String,
+    pub size: u64,
 }

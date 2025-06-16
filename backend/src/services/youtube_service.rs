@@ -105,7 +105,7 @@ pub async fn extract_quality_options(url: &str) -> Result<QualityOptions> {
     }
 }
 
-pub async fn download_video(request: DownloadRequest) -> Result<Vec<u8>> {
+pub async fn download_video(request: DownloadRequest) -> Result<(Vec<u8>, String)> {
     if !is_valid_youtube_url(&request.url) {
         return Err(anyhow!("Invalid YouTube URL"));
     }
@@ -117,50 +117,71 @@ pub async fn download_video(request: DownloadRequest) -> Result<Vec<u8>> {
 
     let temp_dir = std::env::temp_dir();
     let unique_id = Uuid::new_v4().to_string();
-    let output_template = temp_dir.join(format!("vidsaver_{}_%(title)s.%(ext)s", unique_id));
+    let output_template = temp_dir.join(format!("vidsaver_{}_%%(title)s.%%(ext)s", unique_id));
 
     let mut args = vec![
         "--no-playlist".to_string(),
         "--no-warnings".to_string(),
-        "--restrict-filenames".to_string(), // Ensure safe filenames
+        "--newline".to_string(), // Better progress tracking
         "-o".to_string(),
         output_template.to_string_lossy().to_string(),
     ];
 
-    // Configure format selection based on request type and quality
     match request.r#type.as_str() {
         "video" => {
-            // Download video with audio
-            let format_selector = build_video_format_selector(&request);
-            args.push("-f".to_string());
-            args.push(format_selector);
+            // Download video with audio - use specific quality selections
+            match (&request.video_quality, &request.audio_quality) {
+                (Some(video_qual), Some(audio_qual)) => {
+                    // Specific video + audio quality
+                    args.push("-f".to_string());
+                    args.push(format!("{}+{}", video_qual, audio_qual));
+                    println!("Downloading with specific qualities: video={}, audio={}", video_qual, audio_qual);
+                }
+                (Some(video_qual), None) => {
+                    // Specific video + best audio
+                    args.push("-f".to_string());
+                    args.push(format!("{}+bestaudio/{}+bestaudio[ext=m4a]/best", video_qual, video_qual));
+                    println!("Downloading with video quality: {}", video_qual);
+                }
+                _ => {
+                    // Fallback to best quality
+                    args.push("-f".to_string());
+                    args.push("best[height<=1080]/best".to_string());
+                    println!("Downloading with best available quality");
+                }
+            }
         }
         "audio" => {
             // Download audio only
-            let format_selector = build_audio_format_selector(&request);
-            args.push("-f".to_string());
-            args.push(format_selector);
+            if let Some(audio_quality) = &request.audio_quality {
+                args.push("-f".to_string());
+                args.push(audio_quality.clone());
+                println!("Downloading audio with quality: {}", audio_quality);
+            } else {
+                args.push("-f".to_string());
+                args.push("bestaudio/best".to_string());
+                println!("Downloading best audio");
+            }
         }
         "mp3" => {
-            // Download audio and convert to MP3
-            let format_selector = build_audio_format_selector(&request);
-            args.push("-f".to_string());
-            args.push(format_selector);
+            // Download and convert to MP3
+            if let Some(audio_quality) = &request.audio_quality {
+                args.push("-f".to_string());
+                args.push(audio_quality.clone());
+            } else {
+                args.push("-f".to_string());
+                args.push("bestaudio/best".to_string());
+            }
             args.push("--extract-audio".to_string());
             args.push("--audio-format".to_string());
             args.push("mp3".to_string());
             args.push("--audio-quality".to_string());
             args.push("0".to_string()); // Best quality
-            
-            // Use ffmpeg for conversion if available
-            if check_ffmpeg_available() {
-                args.push("--prefer-ffmpeg".to_string());
-            }
+            println!("Downloading and converting to MP3");
         }
         _ => return Err(anyhow!("Invalid download type")),
     }
 
-    // Add URL as the last argument
     args.push(request.url.clone());
 
     println!("Executing yt-dlp with args: {:?}", args);
@@ -172,13 +193,16 @@ pub async fn download_video(request: DownloadRequest) -> Result<Vec<u8>> {
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        println!("yt-dlp download error: {}", error);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("yt-dlp stderr: {}", error);
+        println!("yt-dlp stdout: {}", stdout);
         return Err(anyhow!("Download failed: {}", error));
     }
 
     // Find the downloaded file
     let mut entries = fs::read_dir(&temp_dir).await?;
     let mut downloaded_file = None;
+    let mut filename = String::new();
 
     while let Some(entry) = entries.next_entry().await? {
         let file_name = entry.file_name();
@@ -186,70 +210,49 @@ pub async fn download_video(request: DownloadRequest) -> Result<Vec<u8>> {
         
         if file_name_str.starts_with(&format!("vidsaver_{}", unique_id)) {
             downloaded_file = Some(entry.path());
+            // Extract just the filename without the unique prefix
+            filename = file_name_str
+                .strip_prefix(&format!("vidsaver_{}_", unique_id))
+                .unwrap_or(&file_name_str)
+                .to_string();
             break;
         }
     }
 
     match downloaded_file {
         Some(file_path) => {
-            println!("Found downloaded file: {:?}", file_path);
             let file_data = fs::read(&file_path).await?;
             // Clean up the temporary file
             let _ = fs::remove_file(&file_path).await;
-            Ok(file_data)
+            
+            // Generate a clean filename if we couldn't extract one
+            if filename.is_empty() {
+                filename = match request.r#type.as_str() {
+                    "video" => "video.mp4".to_string(),
+                    "audio" => "audio.m4a".to_string(),
+                    "mp3" => "audio.mp3".to_string(),
+                    _ => "download".to_string(),
+                };
+            }
+            
+            println!("Download completed: {} ({} bytes)", filename, file_data.len());
+            Ok((file_data, filename))
         }
         None => {
             // List all files in temp directory for debugging
             let mut debug_entries = fs::read_dir(&temp_dir).await?;
             println!("Files in temp directory:");
             while let Some(entry) = debug_entries.next_entry().await? {
-                println!("  {:?}", entry.file_name());
+                println!("  {}", entry.file_name().to_string_lossy());
             }
-            Err(anyhow!("Downloaded file not found with pattern vidsaver_{}", unique_id))
+            Err(anyhow!("Downloaded file not found with unique_id: {}", unique_id))
         }
-    }
-}
-
-fn build_video_format_selector(request: &DownloadRequest) -> String {
-    match (&request.video_quality, &request.audio_quality) {
-        (Some(video_fmt), Some(audio_fmt)) => {
-            // Specific video + specific audio
-            format!("{}+{}/best[height<=1080]/best", video_fmt, audio_fmt)
-        }
-        (Some(video_fmt), None) => {
-            // Specific video + best audio
-            format!("{}+bestaudio/best[height<=1080]/best", video_fmt)
-        }
-        (None, Some(audio_fmt)) => {
-            // Best video + specific audio
-            format!("bestvideo[height<=1080]+{}/best", audio_fmt)
-        }
-        (None, None) => {
-            // Best overall
-            "best[height<=1080]/best".to_string()
-        }
-    }
-}
-
-fn build_audio_format_selector(request: &DownloadRequest) -> String {
-    if let Some(audio_fmt) = &request.audio_quality {
-        format!("{}/bestaudio/best", audio_fmt)
-    } else {
-        "bestaudio/best".to_string()
     }
 }
 
 fn check_ytdlp_available() -> bool {
     Command::new("yt-dlp")
         .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
-}
-
-fn check_ffmpeg_available() -> bool {
-    Command::new("ffmpeg")
-        .arg("-version")
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
@@ -305,14 +308,6 @@ fn create_mock_quality_options() -> QualityOptions {
                 width: Some(640),
                 height: Some(360),
             },
-            VideoFormat {
-                format_id: "133".to_string(),
-                quality: "240p".to_string(),
-                ext: "mp4".to_string(),
-                filesize: Some(8 * 1024 * 1024), // 8MB
-                width: Some(426),
-                height: Some(240),
-            },
         ],
         audio: vec![
             AudioFormat {
@@ -326,18 +321,6 @@ fn create_mock_quality_options() -> QualityOptions {
                 ext: "m4a".to_string(),
                 abr: 48,
                 filesize: Some(3 * 1024 * 1024), // 3MB
-            },
-            AudioFormat {
-                format_id: "249".to_string(),
-                ext: "webm".to_string(),
-                abr: 50,
-                filesize: Some(3 * 1024 * 1024), // 3MB
-            },
-            AudioFormat {
-                format_id: "250".to_string(),
-                ext: "webm".to_string(),
-                abr: 70,
-                filesize: Some(4 * 1024 * 1024), // 4MB
             },
             AudioFormat {
                 format_id: "251".to_string(),
@@ -359,14 +342,14 @@ fn parse_quality_options(json: Value) -> Result<QualityOptions> {
             let ext = format["ext"].as_str().unwrap_or("unknown").to_string();
             let filesize = format["filesize"].as_u64();
             
-            // Parse video formats
+            // Check if this is a video format (has video codec and height)
             if let Some(vcodec) = format["vcodec"].as_str() {
                 if vcodec != "none" && format["height"].is_number() {
                     let height = format["height"].as_u64().unwrap_or(0) as u32;
                     let width = format["width"].as_u64().map(|w| w as u32);
                     
-                    // Filter for common video formats and reasonable qualities
-                    if height >= 144 && height <= 4320 && is_supported_video_format(&ext) {
+                    // Only include reasonable video formats
+                    if height >= 144 && height <= 2160 {
                         video_formats.push(VideoFormat {
                             format_id: format_id.clone(),
                             quality: format!("{}p", height),
@@ -379,13 +362,13 @@ fn parse_quality_options(json: Value) -> Result<QualityOptions> {
                 }
             }
 
-            // Parse audio formats
+            // Check if this is an audio format (has audio codec, no video codec)
             if let Some(acodec) = format["acodec"].as_str() {
                 if acodec != "none" && format["vcodec"].as_str() == Some("none") {
                     let abr = format["abr"].as_f64().unwrap_or(128.0) as u32;
                     
-                    // Filter for common audio formats
-                    if abr > 0 && is_supported_audio_format(&ext) {
+                    // Only include reasonable audio formats
+                    if abr > 0 {
                         audio_formats.push(AudioFormat {
                             format_id: format_id.clone(),
                             ext: ext.clone(),
@@ -398,31 +381,18 @@ fn parse_quality_options(json: Value) -> Result<QualityOptions> {
         }
     }
 
-    // Sort and deduplicate video formats
+    // Remove duplicates and sort
     video_formats.sort_by(|a, b| {
         let height_a = a.height.unwrap_or(0);
         let height_b = b.height.unwrap_or(0);
-        height_b.cmp(&height_a) // Sort by height descending
+        height_b.cmp(&height_a)
     });
-    
-    // Remove duplicate heights, keeping the first (highest quality) of each resolution
-    let mut seen_heights = std::collections::HashSet::new();
-    video_formats.retain(|format| {
-        if let Some(height) = format.height {
-            seen_heights.insert(height)
-        } else {
-            true
-        }
-    });
+    video_formats.dedup_by(|a, b| a.height == b.height && a.ext == b.ext);
 
-    // Sort and deduplicate audio formats
-    audio_formats.sort_by(|a, b| b.abr.cmp(&a.abr)); // Sort by bitrate descending
-    
-    // Remove duplicate bitrates, keeping the first (preferred format) of each bitrate
-    let mut seen_bitrates = std::collections::HashSet::new();
-    audio_formats.retain(|format| seen_bitrates.insert(format.abr));
+    audio_formats.sort_by(|a, b| b.abr.cmp(&a.abr));
+    audio_formats.dedup_by(|a, b| a.abr == b.abr && a.ext == b.ext);
 
-    // Add defaults if none found
+    // Add default options if none found
     if video_formats.is_empty() {
         video_formats = create_mock_quality_options().video;
     }
@@ -431,22 +401,10 @@ fn parse_quality_options(json: Value) -> Result<QualityOptions> {
         audio_formats = create_mock_quality_options().audio;
     }
 
-    // Limit to reasonable number of options
-    video_formats.truncate(10);
-    audio_formats.truncate(8);
-
     Ok(QualityOptions {
         video: video_formats,
         audio: audio_formats,
     })
-}
-
-fn is_supported_video_format(ext: &str) -> bool {
-    matches!(ext, "mp4" | "webm" | "mkv" | "avi")
-}
-
-fn is_supported_audio_format(ext: &str) -> bool {
-    matches!(ext, "m4a" | "webm" | "mp3" | "aac" | "opus")
 }
 
 fn extract_video_id(url: &str) -> Option<&str> {
@@ -464,10 +422,7 @@ fn extract_video_id(url: &str) -> Option<&str> {
 }
 
 fn is_valid_youtube_url(url: &str) -> bool {
-    url.contains("youtube.com/watch") || 
-    url.contains("youtu.be/") || 
-    url.contains("youtube.com/embed/") ||
-    url.contains("youtube.com/v/")
+    url.contains("youtube.com/watch") || url.contains("youtu.be/") || url.contains("youtube.com/embed/")
 }
 
 fn format_duration(seconds: f64) -> String {
