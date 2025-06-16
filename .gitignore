@@ -4,6 +4,7 @@
 /backend/*.rs~
 
 **/*.rlib
+**/*.d
 **/*.rmeta
 **/*.profraw
 *.dSYM
