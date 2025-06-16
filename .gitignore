@@ -1,3 +1,48 @@
+# Rust build output
+/target/
+
+# Cargo package backup files
+**/*.rs.bk
+**/*.rs~
+
+# Environment files
+.env
+.env.*
+
+# Rust build artifacts
+**/*.rlib
+**/*.rmeta
+
+# IDE/editor config
+.vscode/
+.idea/
+*.iml
+*.code-workspace
+
+# System files
+.DS_Store
+
+# Temporary/backup files
+*.swp
+*~
+
+# Logs and dumps
+*.log
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.out
+
+# Coverage/debug/test outputs
+/coverage/
+/debug/
+/dist/
+/*.profraw
+
 # Logs
 logs
 *.log
